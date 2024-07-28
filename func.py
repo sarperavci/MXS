@@ -84,7 +84,7 @@ class MassScanner:
 
                 # process the completed tasks
                 for task in done:
-                    self.process_task(task)
+                    await self.process_task(task)
 
             urlsFile.close()
 
