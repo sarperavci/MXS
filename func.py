@@ -81,20 +81,20 @@ class MassScanner:
                     if self.payload in response_text:
                         self.save_vulnerable_url(url)
                         self.total_found +=1
-                        print(Fore.RED + "[+] Vulnerable URL: " + Fore.WHITE + (self.redactURL(url) if self.redactDomains else url))
+                        print(f"{Fore.RED} [+] Vulnerable URL: {Fore.WHITE} {(self.redactURL(url) if self.redactDomains else url)}")
 
             urlsFile.close()
 
     def run(self):
 
-        print(Fore.YELLOW + f"[i] Starting scan with {self.concurrency} concurrency")
-        print(Fore.YELLOW + f"[i] Output file: {self.output}")
-        print(Fore.YELLOW + f"[i] Timeout: {self.timeout}")
+        print(f"{Fore.YELLOW} [i] Starting scan with {self.concurrency} concurrency")
+        print(f"{Fore.YELLOW} [i] Output file: {self.output}")
+        print(f"{Fore.YELLOW} [i] Timeout: {self.timeout}")
 
         asyncio.run(self.scan())
         
-        print(Fore.YELLOW + f"[i] Scanning finished. All vulnerabilities are saved to {self.output}")
-        print(Fore.YELLOW + f"[i] Total found: {self.total_found}")
-        print(Fore.YELLOW + f"[i] Total scanned: {self.total_scanned}")
-        print(Fore.YELLOW + f"[i] Time taken: {int(time.time() - self.t0)}")
+        print(f"{Fore.YELLOW} [i] Scanning finished. All vulnerabilities are saved to {self.output}")
+        print(f"{Fore.YELLOW} [i] Total found: {self.total_found}")
+        print(f"{Fore.YELLOW} [i] Total scanned: {self.total_scanned}")
+        print(f"{Fore.YELLOW} [i] Time taken: {int(time.time() - self.t0)}")
         
