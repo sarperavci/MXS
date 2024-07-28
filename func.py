@@ -64,12 +64,14 @@ class MassScanner:
             urlsFile = open(self.file, "r")
             line = urlsFile.readline()
 
-            while line: 
+            while line or self.pending or self.queue: 
                 # create new tasks until the concurrency limit is reached
                 while len(self.pending) < self.concurrency: 
                     if self.queue:
                         self.pending.append(asyncio.create_task(self.fetch(session, self.queue.pop(0))) )
                     else:
+                        if not line:
+                            break
                         payload_urls = self.createURLs(line.strip())
                         for payload_url in payload_urls:
                             if len(self.pending) < self.concurrency:
@@ -77,6 +79,7 @@ class MassScanner:
                             else:
                                 self.queue.append(payload_url)
                         line = urlsFile.readline()
+                       
 
                 # wait for at least one task to be completed        
                 done, self.pending = await asyncio.wait(self.pending, return_when=asyncio.FIRST_COMPLETED)
