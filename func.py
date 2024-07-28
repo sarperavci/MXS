@@ -50,6 +50,15 @@ class MassScanner:
         except:
             return ("", url)
         
+    async def process_task(self,task):
+        self.total_scanned += 1
+        response_text , url  = task.result()
+        url = url.replace(self.encoded_payload, self.polygot_payload )
+        if self.payload in response_text:
+            self.save_vulnerable_url(url)
+            self.total_found +=1
+            print(f"{Fore.RED} [+] Vulnerable parameter found: {Fore.WHITE} {(self.redactURL(url) if self.redactDomains else url)}")
+
     async def scan(self):
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
             urlsFile = open(self.file, "r")
@@ -75,13 +84,7 @@ class MassScanner:
 
                 # process the completed tasks
                 for task in done:
-                    self.total_scanned += 1
-                    response_text , url  = task.result()
-                    url = url.replace(self.encoded_payload, self.polygot_payload )
-                    if self.payload in response_text:
-                        self.save_vulnerable_url(url)
-                        self.total_found +=1
-                        print(f"{Fore.RED} [+] Vulnerable parameter found: {Fore.WHITE} {(self.redactURL(url) if self.redactDomains else url)}")
+                    self.process_task(task)
 
             urlsFile.close()
 
