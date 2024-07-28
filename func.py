@@ -50,7 +50,7 @@ class MassScanner:
         except:
             return ("", url)
         
-    async def process_task(self,task):
+    def process_task(self,task):
         self.total_scanned += 1
         response_text , url  = task.result()
         url = url.replace(self.encoded_payload, self.polygot_payload )
@@ -84,7 +84,7 @@ class MassScanner:
 
                 # process the completed tasks
                 for task in done:
-                    await self.process_task(task)
+                    self.process_task(task)
 
             urlsFile.close()
 
