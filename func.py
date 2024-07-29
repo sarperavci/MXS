@@ -45,7 +45,7 @@ class MassScanner:
 
     async def fetch(self, session:aiohttp.ClientSession, url:str):
         try:
-            async with session.get(url,timeout=self.timeout) as resp:
+            async with session.get(url, allow_redirects=True, timeout=self.timeout) as resp:
                 return (await resp.text() ,   url)
         except Exception as e:
             return ("",   url)
