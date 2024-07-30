@@ -27,10 +27,11 @@ class MassScanner:
     def generatePayloadURLs(self,url):
         urlCombinations = []
         scheme, netloc, path, queryString, fragment = urlsplit(url)
+        scheme = "http"
         queryParams = parse_qs(queryString, keep_blank_values=True)
         for key in queryParams.keys():
             modifiedParams = queryParams.copy()
-            modifiedParams[key] = [self.payload]  # Replace the parameter value with the payload
+            modifiedParams[key] = [self.payload]
             modifiedQueryString = urlencode(modifiedParams, doseq=True)
             modifiedUrl = urlunsplit((scheme, netloc, path, modifiedQueryString, fragment))
             urlCombinations.append(modifiedUrl)
@@ -43,24 +44,49 @@ class MassScanner:
                 f.write(url + "\n")
         self.injectables = []
 
-    async def fetch(self, session:aiohttp.ClientSession, url:str):
-        try:
-            async with session.get(url, allow_redirects=True, timeout=self.timeout) as resp:
-                return (await resp.text() ,   url)
-        except Exception as e:
-            return ("",   url)
+    async def fetch(self, sem:asyncio.Semaphore, session:aiohttp.ClientSession, url:str):
+        async with sem:
+            try:
+                responseText = ""
+                async with session.get(url, allow_redirects=True) as resp:
+                    isAborted = False
+                    responseHeaders = resp.headers
+                    
+                    contentType = responseHeaders.get("Content-Type","")
+                    contentLength = int(responseHeaders.get("Content-Length", -1))
+                    
+                    if "text/html" not in contentType:
+                            resp.connection.transport.abort()
+                            isAborted = True
                 
-    def processTask(self,task):
-        self.totalScanned += 1
-        responseText , url  = task.result()
-        url = url.replace(self.encodedPayload, self.polygotPayload )
-        if self.payload in responseText:
-            self.injectables.append(url)
-            self.totalFound +=1
-            print(f"{Fore.RED} [+] Vulnerable parameter found: {Fore.WHITE} {(self.redactURL(url) if self.redactDomains else url)}")
+                    elif contentLength > 1000000:
+                            resp.connection.transport.abort()
+                            isAborted = True
+        
+                    if not isAborted:
+                        content = await resp.read()
+                        encoding =  resp.get_encoding() or 'utf-8'
+                        responseText = content.decode(encoding, errors="ignore")
+            except:
+                pass
+
+            return (responseText , url)
+
+    def processTasks(self, done):
+        for task in done:
+            self.totalScanned += 1
+            responseText, url = task
+            url = url.replace(self.encodedPayload, self.polygotPayload)
+            if self.payload in responseText:
+                self.injectables.append(url)
+                self.totalFound +=1
+                print(f"{Fore.RED} [+] Vulnerable parameter found: {Fore.WHITE} {(self.redactURL(url) if self.redactDomains else url)}")
 
     async def scan(self):
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False,limit=0)) as session:
+        sem = asyncio.Semaphore(self.concurrency)
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
+
+        async with aiohttp.ClientSession(timeout=timeout,connector=aiohttp.TCPConnector(verify_ssl=False, limit=0, enable_cleanup_closed=True)) as session:
             urlsFile = open(self.file, "r")
             line = urlsFile.readline()
             while line:
@@ -68,19 +94,18 @@ class MassScanner:
                 while len(pending) < self.concurrency and line:
                     urlsWithPayload = self.generatePayloadURLs(line.strip())
                     for url in urlsWithPayload:
-                        pending.append(asyncio.create_task(self.fetch(session,url)))
+                        pending.append(asyncio.ensure_future(self.fetch(sem,session,url)))
                     line = urlsFile.readline()
 
-                done, _ = await asyncio.wait(pending)
-                for task in done:
-                    self.processTask(task)
-
+                done = await asyncio.gather(*pending)
+                self.processTasks(done)
+                
                 self.saveInjectablesToFile()
+                print(f'{Fore.YELLOW} [i] Scanned {self.totalScanned} URLs. Found {self.totalFound} injectable URLs', end="\r")
             
             urlsFile.close()
 
     def run(self):
-
         print(f"{Fore.YELLOW} [i] Starting scan with {self.concurrency} concurrency")
         print(f"{Fore.YELLOW} [i] Output file: {self.output}")
         print(f"{Fore.YELLOW} [i] Timeout: {self.timeout} seconds")
@@ -90,5 +115,4 @@ class MassScanner:
         print(f"{Fore.YELLOW} [i] Scanning finished. All URLs are saved to {self.output}")
         print(f"{Fore.YELLOW} [i] Total found: {self.totalFound}")
         print(f"{Fore.YELLOW} [i] Total scanned: {self.totalScanned}")
-        print(f"{Fore.YELLOW} [i] Time taken: {int(time.time() - self.t0)} seconds")
-        
+        print(f"{Fore.YELLOW} [i] Time taken: {int(time.time() - self.t0)} seconds")   
