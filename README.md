@@ -11,7 +11,7 @@ An advanced XSS scanner that utilizes asynchronous requests to scan a large numb
 
 ## Demo Video
 
-![](https://cdn.sarperavci.com/pvYeTsib/tewXFr.gif)
+![](https://cdn.sarperavci.com/cJnVRnYy/CZuIEt.gif)
 
 ## Installation
 
