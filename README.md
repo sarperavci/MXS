@@ -49,8 +49,7 @@ This will scan the `wordlist.txt` file with a concurrency of 1500, a timeout of 
 
 ## What's Next?
 
-- Add support for multiple payloads.
-- Improve the concurrency system.
+[Planned features](https://github.com/sarperavci/MXS/issues/7)
 
 ## Notes
 
